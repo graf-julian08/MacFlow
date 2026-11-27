@@ -71,7 +71,7 @@ struct PreviewSurface<Overlay: View>: View {
                 }
             }
         }
-        .frame(height: height)
+        .frame(minHeight: height, maxHeight: .infinity)
         .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
     }
 }

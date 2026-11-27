@@ -8,11 +8,13 @@ FFmpeg 9.0.1, cwebp 1.6 and oggenc 1.4.3 present (Homebrew).
 | Suite | Tests | Result |
 |---|---|---|
 | ConversionMatrixTests | 20 | ✅ all pass |
-| ToolTests | 20 | ✅ all pass |
+| ToolTests | 21 | ✅ all pass |
+| ToolMatrixTests | 1 (244 tool runs) | ✅ all pass |
+| PagerLockTests | 1 | ✅ pass |
 | CoreUnitTests | 6 | ✅ all pass |
 | DragAndWheelTests | 7 | ✅ all pass |
 | SnapshotTests | 2 | rendered on request (`MACFLOW_SNAPSHOTS`), reviewed visually |
-| **Total** | **55** | **0 failures** |
+| **Total** | **58** | **0 failures** |
 
 ## Conversion matrix
 
@@ -47,11 +49,30 @@ audio trim (sample-exact), normalize (−1 dBFS), fade, mono, archive extract (e
 removed), archive test, path-traversal archive refused, JSON format/minify (key order and number
 text preserved), subtitle shift (negative times refused), OGG Vorbis encode/decode and editing an OGG keeps OGG.
 
+## Tool matrix
+
+Every tool the ⌘ wheel offers was applied to every fixture it is offered for (244 runs,
+`tool-matrix.txt`) with content checks: crop/rotate/resize dimensions, metadata fields stored and
+pixels identical, video/audio durations, mono output, PDF page counts, watermark text, PDF metadata,
+password protection, split counts, archive selection honoured, exact subtitle shifts. Four honest
+refusals are expected and asserted (no subject for background removal in synthetic images; PDFs that
+cannot be compressed further).
+
+A dedicated test writes all ten metadata fields into JPEG, HEIC, PNG and TIFF files that already
+carry metadata, then edits one field, clears one, removes the location and finally removes
+everything — each step read back field by field.
+
 ## Bugs found and fixed during testing
 
 * Removing a PDF password wrote a still-encrypted file → pages are now copied into a new document.
 * JSON arrays → XML produced several root elements → wrapped in `<root>`.
-* Scanned PDFs offered text targets that could only fail → now offered via OCR.
+* Scanned PDFs offered text targets that could only fail → now offered via OCR (also Extract Text).
+* Metadata (2.0.1): author/title/description/copyright were written with the wrong XMP type —
+  ImageIO's HEIC writer crashed on files that already had them; PNG/TIFF kept stale EXIF values;
+  "remove all" left XMP fields in HEIC. Rewritten with well-formed XMP (JPEG/HEIC, no re-encoding)
+  and a lossless property pass (PNG/TIFF); TIFF GPS is preserved across edits.
+* MORE/BACK flipped pages back and forth while the pointer rested → pager lock.
+* Missing main menu: ⌘C/⌘V/⌘A/⌘Z did not work in panel text fields → added.
 * JSON/YAML containing `null` offered plist → now hidden for such files.
 
 ## Not covered automatically

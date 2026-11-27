@@ -14,7 +14,7 @@ final class AppSettings: ObservableObject {
     @AppStorage("launchAtLogin") var launchAtLogin: Bool = true { didSet { applyLoginItem() } }
     @AppStorage("showMenuBarIcon") var showMenuBarIcon: Bool = true
     @AppStorage("defaultOutputLocation") var defaultOutputLocationPath: String = ""
-    @AppStorage("openResultInFinder") var openResultInFinder: Bool = false
+    @AppStorage("openResultInFinder") var openResultInFinder: Bool = true
     @AppStorage("saveNextToOriginal") var saveNextToOriginal: Bool = true
     @AppStorage("playSounds") var playSounds: Bool = true
 

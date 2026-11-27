@@ -58,7 +58,13 @@ final class ToolPanelController: NSObject, NSWindowDelegate {
             self.runningTask = Task { @MainActor in
                 let ok = await run(request, context)
                 context.busy = false
-                if ok { self.close(restoreFocus: true) }
+                if self.context === context {
+                    // When the result is revealed, Finder keeps the focus.
+                    if ok { self.close(restoreFocus: !AppSettings.shared.openResultInFinder) }
+                } else if !ok, let message = context.error {
+                    // The panel was replaced while this job ran: report here.
+                    HUDController.shared.fail(nil, title: "\(context.tool.title) failed", detail: message)
+                }
             }
         }
         context.cancelHandler = { [weak self, weak context] in
@@ -66,7 +72,7 @@ final class ToolPanelController: NSObject, NSWindowDelegate {
             if context?.busy == true { self.runningTask?.cancel() } else { self.close(restoreFocus: true) }
         }
         self.context = context
-        show(view: AnyView(ToolPanelRoot(context: context)), at: location)
+        show(view: AnyView(ToolPanelRoot(context: context)), at: location, resizable: true)
     }
 
     /// A small confirmation card in the same style (used for best-effort conversions).
@@ -76,25 +82,30 @@ final class ToolPanelController: NSObject, NSWindowDelegate {
             self?.close(restoreFocus: !ok)
             completion(ok)
         }
-        show(view: AnyView(view), at: location)
+        show(view: AnyView(view), at: location, resizable: false)
     }
 
-    private func show(view: AnyView, at location: NSPoint) {
+    private func show(view: AnyView, at location: NSPoint, resizable: Bool) {
         let front = NSWorkspace.shared.frontmostApplication
         if front?.bundleIdentifier != Bundle.main.bundleIdentifier { previousApp = front }
 
         // The hosting controller drives the window size, so the panel grows
         // and shrinks with its content (errors, options, previews).
         let controller = NSHostingController(rootView: view.environment(\.toolPanelAppearance, true))
-        controller.sizingOptions = [.preferredContentSize]
+        // Tool panels can grow (zoom, resize) but never shrink below their
+        // content; the confirmation card always fits its content exactly.
+        controller.sizingOptions = resizable ? [.minSize] : [.preferredContentSize]
         let size = controller.view.fittingSize
         let panel = ToolPanel(contentRect: NSRect(origin: .zero, size: size),
-                              styleMask: [.titled, .closable, .fullSizeContentView],
+                              styleMask: resizable ? [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView]
+                                                   : [.titled, .closable, .fullSizeContentView],
                               backing: .buffered, defer: false)
         panel.titleVisibility = .hidden
         panel.titlebarAppearsTransparent = true
-        panel.standardWindowButton(.miniaturizeButton)?.isHidden = true
-        panel.standardWindowButton(.zoomButton)?.isHidden = true
+        if !resizable {
+            panel.standardWindowButton(.miniaturizeButton)?.isHidden = true
+            panel.standardWindowButton(.zoomButton)?.isHidden = true
+        }
         panel.isMovableByWindowBackground = true
         panel.isReleasedWhenClosed = false
         panel.level = .floating
@@ -258,7 +269,8 @@ struct ToolChrome<Content: View>: View {
         .padding(.horizontal, 22)
         .padding(.top, 18)
         .padding(.bottom, 18)
-        .frame(width: width)
+        // The given width is the minimum; zoom/resize lets previews grow.
+        .frame(minWidth: width, maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .background { ToolPanelBackground() }
         .animation(.easeOut(duration: 0.18), value: context.error)
     }
@@ -282,7 +294,7 @@ struct ToolChrome<Content: View>: View {
             }
             Spacer()
         }
-        .padding(.leading, 52) // clear the window's close button
+        .padding(.leading, 76) // clear the window's close, minimise and zoom buttons
     }
 
     private var footer: some View {
@@ -301,7 +313,7 @@ struct ToolChrome<Content: View>: View {
                     .lineLimit(2)
             }
             Spacer()
-            Button(context.busy ? "Stop" : "Cancel") { context.cancel() }
+            Button(context.busy ? "Stop" : (showsPrimary ? "Cancel" : "Done")) { context.cancel() }
                 .keyboardShortcut(.cancelAction)
                 .controlSize(.large)
             if showsPrimary {

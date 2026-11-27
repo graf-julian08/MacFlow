@@ -66,7 +66,7 @@ final class HUDController {
     func succeed(_ id: UUID?, title: String, detail: String?, outputs: [URL]) {
         finish(id, item: HUDItem(id: id ?? UUID(), kind: .success, title: title, detail: detail, progress: nil, outputs: outputs, symbol: "checkmark"), hideAfter: 4.5)
         if AppSettings.shared.openResultInFinder, !outputs.isEmpty {
-            NSWorkspace.shared.activateFileViewerSelecting(outputs)
+            Self.reveal(outputs)
         }
     }
 
@@ -77,6 +77,14 @@ final class HUDController {
 
     func info(_ title: String, detail: String?, symbol: String = "info") {
         finish(nil, item: HUDItem(id: UUID(), kind: .info, title: title, detail: detail, progress: nil, symbol: symbol), hideAfter: 4)
+    }
+
+    /// Selects the new items in Finder and scrolls them into view. Items
+    /// that vanished in the meantime are skipped.
+    static func reveal(_ urls: [URL]) {
+        let existing = urls.filter { FileManager.default.fileExists(atPath: $0.path) }
+        guard !existing.isEmpty else { return }
+        NSWorkspace.shared.activateFileViewerSelecting(existing)
     }
 
     func cancelled(_ id: UUID?) {
@@ -288,7 +296,7 @@ private struct HUDCard: View {
     }
 
     private func reveal() {
-        NSWorkspace.shared.activateFileViewerSelecting(item.outputs)
+        HUDController.reveal(item.outputs)
         controller.remove(item.id)
     }
 }

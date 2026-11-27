@@ -70,7 +70,7 @@ struct CompressToolView: View {
         } content: {
             HStack(alignment: .top, spacing: 16) {
                 PreviewSurface(image: preview.image, height: 220)
-                    .frame(width: 200)
+                    .frame(minWidth: 200, maxWidth: .infinity)
                 VStack(alignment: .leading, spacing: 12) {
                     Picker("Format", selection: $settings.format) {
                         ForEach(formatChoices) { Text($0.title).tag($0) }
@@ -100,6 +100,7 @@ struct CompressToolView: View {
                     }
                     Toggle("Remove metadata", isOn: $settings.stripMetadata)
                 }
+                .frame(width: 300)
             }
         }
         .onAppear {
@@ -199,7 +200,7 @@ struct MetadataToolView: View {
                         }
                         .padding(.horizontal, 10)
                     }
-                    .frame(height: 360)
+                    .frame(minHeight: 360, maxHeight: .infinity)
                     .background(RoundedRectangle(cornerRadius: 10, style: .continuous).fill(Color.primary.opacity(0.05)))
                     .opacity(removeAll ? 0.4 : 1)
                 }
@@ -277,7 +278,7 @@ struct AdjustToolView: View {
             HStack(alignment: .top, spacing: 16) {
                 PreviewSurface(image: comparing ? preview.image : (rendered ?? preview.image), height: 380)
                     .gesture(DragGesture(minimumDistance: 0).onChanged { _ in comparing = true }.onEnded { _ in comparing = false })
-                    .frame(width: 380)
+                    .frame(minWidth: 380, maxWidth: .infinity)
                 VStack(alignment: .leading, spacing: 7) {
                     HStack {
                         Toggle("Auto Enhance", isOn: $settings.auto)
@@ -296,6 +297,7 @@ struct AdjustToolView: View {
                     SliderRow(title: "Blur", value: $settings.blur, range: 0...1, format: { String(format: "%.0f", $0 * 100) }, neutral: 0)
                     SliderRow(title: "Vignette", value: $settings.vignette, range: 0...1, format: { String(format: "%.0f", $0 * 100) }, neutral: 0)
                 }
+                .frame(width: 280)
             }
         }
         .onAppear { preview.load(context.primary, maxPixel: 1200) }
@@ -533,7 +535,7 @@ struct RotateToolView: View {
                     .rotationEffect(.degrees(Double(settings.quarterTurns * 90)))
                     .scaleEffect(x: settings.flipHorizontal ? -1 : 1, y: settings.flipVertical ? -1 : 1)
                     .animation(.spring(response: 0.35, dampingFraction: 0.8), value: settings)
-                    .frame(height: 320)
+                    .frame(minHeight: 320, maxHeight: .infinity)
                 HStack(spacing: 10) {
                     rotateButton("Left", "rotate.left") { settings.quarterTurns -= 1 }
                     rotateButton("Right", "rotate.right") { settings.quarterTurns += 1 }
@@ -685,7 +687,7 @@ struct BackgroundToolView: View {
             context.submit(.background(settings))
         } content: {
             HStack(alignment: .top, spacing: 16) {
-                PreviewSurface(image: rendered ?? preview.image, height: 340).frame(width: 340)
+                PreviewSurface(image: rendered ?? preview.image, height: 340).frame(minWidth: 340, maxWidth: .infinity)
                 VStack(alignment: .leading, spacing: 10) {
                     Picker("", selection: $settings.style) {
                         Text("Solid").tag(BackgroundStyle.solid); Text("Gradient").tag(BackgroundStyle.gradient)
@@ -716,6 +718,7 @@ struct BackgroundToolView: View {
                     .pickerStyle(.menu)
                     Toggle("Drop shadow", isOn: $settings.shadow)
                 }
+                .frame(width: 300)
             }
         }
         .onAppear { preview.load(context.primary, maxPixel: 800) }
@@ -1009,7 +1012,7 @@ struct MakePDFToolView: View {
                     .onMove { order.move(fromOffsets: $0, toOffset: $1) }
                     .onDelete { order.remove(atOffsets: $0) }
                 }
-                .frame(height: 220)
+                .frame(minHeight: 220, maxHeight: .infinity)
                 .scrollContentBackground(.hidden)
                 .background(RoundedRectangle(cornerRadius: 10, style: .continuous).fill(Color.primary.opacity(0.05)))
                 Picker("Page Size", selection: $settings.pageSize) {

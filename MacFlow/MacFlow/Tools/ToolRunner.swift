@@ -396,8 +396,15 @@ enum ToolRunner {
             let txt = FormatRegistry.shared["txt"]
             let dest = temp(txt)
             let doc = try PDFEngine.open(file)
-            try DocumentEngine.write(try PDFEngine.requireText(doc, name: file.lastPathComponent) + "\n", to: dest)
-            return single(try await publishFile(dest, ctx: ctx, suffix: "", format: txt, expectation: ValidationExpectation(requireText: true)))
+            let layer = PDFEngine.plainText(doc)
+            if !layer.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                try DocumentEngine.write(layer + "\n", to: dest)
+                return single(try await publishFile(dest, ctx: ctx, suffix: "", format: txt, expectation: ValidationExpectation(requireText: true)))
+            }
+            // Scanned PDF: recognise the text on-device instead of failing.
+            try DocumentEngine.write(try await PDFTools.recognizedText(doc, progress: progress) + "\n", to: dest)
+            return single(try await publishFile(dest, ctx: ctx, suffix: "", format: txt, expectation: ValidationExpectation(requireText: true)),
+                          note: "Text recognised with OCR — please check it.")
 
         case .makePDF, .merge:
             preconditionFailure("handled in run(_:on:)")

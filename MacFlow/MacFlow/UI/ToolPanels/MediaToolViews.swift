@@ -110,7 +110,7 @@ struct VideoCompressToolView: View {
             context.submit(.videoCompress(settings))
         } content: {
             VStack(alignment: .leading, spacing: 12) {
-                PlayerView(player: model.player).frame(height: 240).clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                PlayerView(player: model.player).frame(minHeight: 240, maxHeight: .infinity).clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
                 Picker("Codec", selection: $settings.codec) {
                     ForEach(VideoCodecChoice.allCases) { Text($0.title).tag($0) }
                 }
@@ -159,7 +159,7 @@ struct VideoTrimToolView: View {
             context.submit(.trim(start: start, end: end))
         } content: {
             VStack(spacing: 12) {
-                PlayerView(player: model.player).frame(height: 300).clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                PlayerView(player: model.player).frame(minHeight: 300, maxHeight: .infinity).clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
                 RangeSlider(lower: $start, upper: $end, bounds: 0...max(model.duration, 0.1), minimumSpan: 0.1) { model.seek($0) }
                 HStack {
                     Button("Set Start") { start = min(model.current, end - 0.1) }
@@ -223,7 +223,7 @@ struct SnapshotToolView: View {
             context.submit(.snapshot(seconds: model.current, formatID: format))
         } content: {
             VStack(spacing: 12) {
-                PlayerView(player: model.player).frame(height: 320).clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                PlayerView(player: model.player).frame(minHeight: 320, maxHeight: .infinity).clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
                 HStack {
                     Button { step(-1) } label: { Image(systemName: "backward.frame.fill") }.help("Previous frame")
                     Button { step(1) } label: { Image(systemName: "forward.frame.fill") }.help("Next frame")

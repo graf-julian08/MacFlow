@@ -25,9 +25,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         }
 
         setupStatusItem()
+        setupMainMenu()
         setupDragHandling()
         applyKeyboardMonitor()
 
+        // 2.0.1: results are revealed in Finder by default.
+        if !UserDefaults.standard.bool(forKey: "migratedRevealDefault") {
+            UserDefaults.standard.set(true, forKey: "migratedRevealDefault")
+            AppSettings.shared.openResultInFinder = true
+        }
         if !UserDefaults.standard.bool(forKey: "didFirstLaunch") {
             UserDefaults.standard.set(true, forKey: "didFirstLaunch")
             AppSettings.shared.applyLoginItem()
@@ -120,6 +126,37 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         case 53: radial.dismiss(animated: true)     // escape
         default: break
         }
+    }
+
+    // MARK: - Main menu
+
+    /// Agent apps show no menu bar, but key equivalents still route through
+    /// the main menu: without it ⌘C/⌘V/⌘A/⌘Z would not work in text fields
+    /// and ⌘W/⌘M not in tool panels.
+    private func setupMainMenu() {
+        let main = NSMenu()
+        func submenu(_ title: String, _ items: [NSMenuItem]) {
+            let item = NSMenuItem(title: title, action: nil, keyEquivalent: "")
+            let menu = NSMenu(title: title)
+            items.forEach { menu.addItem($0) }
+            item.submenu = menu
+            main.addItem(item)
+        }
+        func item(_ title: String, _ action: Selector, _ key: String, _ mods: NSEvent.ModifierFlags = .command) -> NSMenuItem {
+            let i = NSMenuItem(title: title, action: action, keyEquivalent: key)
+            i.keyEquivalentModifierMask = mods
+            return i
+        }
+        let settings = item("Settings…", #selector(showSettings), ",")
+        settings.target = self
+        submenu("MacFlow", [settings, .separator(), item("Hide MacFlow", #selector(NSApplication.hide(_:)), "h"),
+                            item("Quit MacFlow", #selector(NSApplication.terminate(_:)), "q")])
+        submenu("Edit", [item("Undo", Selector(("undo:")), "z"), item("Redo", Selector(("redo:")), "z", [.command, .shift]), .separator(),
+                         item("Cut", #selector(NSText.cut(_:)), "x"), item("Copy", #selector(NSText.copy(_:)), "c"),
+                         item("Paste", #selector(NSText.paste(_:)), "v"), item("Select All", #selector(NSText.selectAll(_:)), "a")])
+        submenu("Window", [item("Close", #selector(NSWindow.performClose(_:)), "w"), item("Minimize", #selector(NSWindow.performMiniaturize(_:)), "m"),
+                           item("Zoom", #selector(NSWindow.performZoom(_:)), "")])
+        NSApp.mainMenu = main
     }
 
     // MARK: - Status item

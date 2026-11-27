@@ -120,6 +120,51 @@ final class ToolTests: XCTestCase {
         XCTAssertNil(fields[.latitude], "GPS must be removed")
     }
 
+    /// Every editable field round-trips on every writable format, including
+    /// files that already carry metadata (this crashed ImageIO's HEIC writer
+    /// when language-alternative fields were written as plain strings).
+    func testMetadataRoundTripEveryFieldEveryFormat() async throws {
+        for (ext, type) in [("jpg", "public.jpeg"), ("heic", "public.heic"), ("png", "public.png"), ("tiff", "public.tiff")] {
+            let src = dir.appendingPathComponent("meta.\(ext)")
+            try? FileManager.default.removeItem(at: src)
+            try Fixtures.writeImage(Fixtures.testImage(width: 120, height: 80, alpha: false), to: src, type: type, properties: [
+                kCGImagePropertyTIFFDictionary: [kCGImagePropertyTIFFArtist: "Old Artist", kCGImagePropertyTIFFImageDescription: "Old description",
+                                                 kCGImagePropertyTIFFCopyright: "Old ©", kCGImagePropertyTIFFMake: "OldMake"],
+                kCGImagePropertyIPTCDictionary: [kCGImagePropertyIPTCKeywords: ["old"], kCGImagePropertyIPTCObjectName: "Old title"],
+                kCGImagePropertyGPSDictionary: [kCGImagePropertyGPSLatitude: 10.0, kCGImagePropertyGPSLatitudeRef: "N",
+                                                kCGImagePropertyGPSLongitude: 20.0, kCGImagePropertyGPSLongitudeRef: "E"],
+            ])
+            var edit = MetadataEdit()
+            let wanted: [MetadataField: String] = [.title: "Lake & Hills", .description: "A <quiet> morning", .author: "Jane Doe",
+                                                   .copyright: "© 2026 Jane", .keywords: "lake, alps", .dateTaken: "2024:05:31 14:30:00",
+                                                   .make: "Apple", .model: "iPhone 17", .latitude: "-33.868800", .longitude: "151.209300"]
+            edit.fields = wanted
+            let out = try await run(.metadata(edit), [src]).outputs[0]
+            XCTAssertTrue(ImageTools.pixelsIdentical(src, out), "\(ext): pixels changed")
+            let read = ImageTools.readFields(out)
+            for (field, value) in wanted {
+                XCTAssertEqual(read[field], value, "\(ext): \(field.label)")
+            }
+            // Editing one field keeps the others (including TIFF GPS).
+            var single = MetadataEdit(); single.fields[.title] = "Only title"
+            let second = try await run(.metadata(single), [out]).outputs[0]
+            let again = ImageTools.readFields(second)
+            XCTAssertEqual(again[.title], "Only title", ext)
+            XCTAssertEqual(again[.author], "Jane Doe", ext)
+            XCTAssertEqual(again[.latitude], "-33.868800", "\(ext): location must survive an unrelated edit")
+            // Clearing fields and removing location.
+            var clear = MetadataEdit(); clear.fields[.author] = ""; clear.removeLocation = true
+            let cleared = ImageTools.readFields(try await run(.metadata(clear), [second]).outputs[0])
+            XCTAssertNil(cleared[.author], ext)
+            XCTAssertNil(cleared[.latitude], ext)
+            XCTAssertEqual(cleared[.title], "Only title", ext)
+            // Remove everything.
+            var all = MetadataEdit(); all.removeAll = true
+            let empty = ImageTools.readFields(try await run(.metadata(all), [second]).outputs[0])
+            XCTAssertTrue(empty.isEmpty, "\(ext): \(empty)")
+        }
+    }
+
     func testRemoveAllMetadataKeepsOrientation() async throws {
         let src = try photo(orientation: 6)
         var edit = MetadataEdit(); edit.removeAll = true

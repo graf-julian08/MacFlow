@@ -14,6 +14,10 @@ wheel segment.
 * Results are **new files** next to the original (`photo.png`, `photo-cropped.jpg`, `photo (2).png` …).
   Originals are only read. Existing files are never overwritten.
 * Every result is decoded again and checked before it is published; a failed check deletes it and shows the reason.
+* New results are selected in Finder right away and scrolled into view (Settings → General → "Reveal results in Finder").
+* Holding the pointer on MORE flips to the next page; the segment that lands under the pointer stays inert until you
+  move to another segment or the centre, so pages never flip back and forth by themselves.
+* Tool panels have the standard window buttons (close, minimise, zoom) and can be resized; previews grow with them.
 * Progress, success ("Show" in Finder) and errors appear in a glass status card at the top of the screen.
 
 ## Install
@@ -106,7 +110,7 @@ The live list is in **Settings → Formats**. Verified by the test suite (`docs/
 
 | Type | Tools |
 |---|---|
-| Image | Compress (format, quality, max size, target size with exact estimate), Metadata (view all tags, edit, delete single tags, remove location/all — written without recompression, pixels verified identical), Edit (exposure, contrast, saturation, vibrance, warmth, highlights, shadows, sharpness, blur, vignette, auto), Crop (handles, aspect presets), Rotate (lossless for JPEG/HEIC), Redact (Vision faces + text, manual areas, black/pixelate/blur, strips metadata), Add Background · More: Resize, Remove Background (Vision), Read QR, Annotate, Make PDF |
+| Image | Compress (format, quality, max size, target size with exact estimate), Metadata (view all tags, edit title/description/author/copyright/keywords/date/camera/location, delete single tags, remove location/all — JPEG/HEIC written without re-encoding, PNG/TIFF losslessly; pixels verified identical), Edit (exposure, contrast, saturation, vibrance, warmth, highlights, shadows, sharpness, blur, vignette, auto), Crop (handles, aspect presets), Rotate (lossless for JPEG/HEIC), Redact (Vision faces + text, manual areas, black/pixelate/blur, strips metadata), Add Background · More: Resize, Remove Background (Vision), Read QR, Annotate, Make PDF |
 | Video | Compress (HEVC/H.264, quality, resolution, 30 fps), Trim and Rotate (no re-encoding), Mute, Extract Audio, Snapshot (frame-exact), Speed |
 | Audio | Trim (sample-accurate, waveform), Volume/Normalize, Fade, Channels |
 | PDF | Compress, Pages (reorder, rotate, delete, duplicate, keep), Metadata, Protect/Unprotect, Watermark, Page Numbers, OCR (searchable PDF or text), Split, Extract Text, Merge (several PDFs) |
@@ -153,7 +157,7 @@ vorbis-tools (GPL-2.0, run as a separate program; libvorbis itself is BSD-3-Clau
 ## Tests
 
 ```sh
-swift test                                   # 55 tests (2 snapshot tests skipped)
+swift test                                   # 58 tests (2 snapshot tests skipped)
 MACFLOW_REPORT=/tmp/matrix.txt swift test    # also writes the conversion report
 MACFLOW_SNAPSHOTS=/tmp/snaps swift test --filter SnapshotTests   # renders wheels and panels
 ```

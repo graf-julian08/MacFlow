@@ -90,7 +90,7 @@ struct PagesToolView: View {
                     }
                     .padding(10)
                 }
-                .frame(height: 420)
+                .frame(minHeight: 420, maxHeight: .infinity)
                 .background(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(Color.primary.opacity(0.04)))
             }
         }
@@ -271,7 +271,7 @@ struct WatermarkToolView: View {
                         .position(x: rect.midX, y: rect.midY)
                         .allowsHitTesting(false)
                 }
-                .frame(width: 250)
+                .frame(minWidth: 250, maxWidth: .infinity)
                 VStack(alignment: .leading, spacing: 10) {
                     TextField("Watermark text", text: $settings.text).textFieldStyle(.roundedBorder)
                     SliderRow(title: "Size", value: $settings.fontSize, range: 12...140, format: { "\(Int($0)) pt" })
@@ -283,6 +283,7 @@ struct WatermarkToolView: View {
                     Toggle("Diagonal", isOn: $settings.diagonal)
                     Toggle("Repeat across the page", isOn: $settings.tiled)
                 }
+                .frame(width: 330)
             }
         }
         .onAppear { page.load(context.primary) }
@@ -314,7 +315,7 @@ struct PageNumbersToolView: View {
                         .position(x: x, y: top ? rect.minY + 14 : rect.maxY - 14)
                         .allowsHitTesting(false)
                 }
-                .frame(width: 230)
+                .frame(minWidth: 230, maxWidth: .infinity)
                 VStack(alignment: .leading, spacing: 10) {
                     Picker("Position", selection: $settings.position) {
                         ForEach(OverlayPosition.allCases) { Text($0.title).tag($0) }
@@ -327,6 +328,7 @@ struct PageNumbersToolView: View {
                     SliderRow(title: "Size", value: $settings.fontSize, range: 7...24, format: { "\(Int($0)) pt" })
                     Toggle("Skip first page", isOn: $settings.skipFirstPage)
                 }
+                .frame(width: 310)
             }
         }
         .onAppear { page.load(context.primary) }
@@ -412,7 +414,7 @@ struct MergeToolView: View {
                 }
                 .onMove { order.move(fromOffsets: $0, toOffset: $1) }
             }
-            .frame(height: 240)
+            .frame(minHeight: 240, maxHeight: .infinity)
             .scrollContentBackground(.hidden)
             .background(RoundedRectangle(cornerRadius: 10, style: .continuous).fill(Color.primary.opacity(0.05)))
         }
@@ -461,7 +463,7 @@ struct ArchiveContentsToolView: View {
                         Text(entry.size.fileSize).font(.system(size: 11).monospacedDigit()).foregroundStyle(.secondary)
                     }
                 }
-                .frame(height: 300)
+                .frame(minHeight: 300, maxHeight: .infinity)
                 .scrollContentBackground(.hidden)
                 .background(RoundedRectangle(cornerRadius: 10, style: .continuous).fill(Color.primary.opacity(0.05)))
                 .overlay { if loading { ProgressView() } }

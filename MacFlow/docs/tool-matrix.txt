@@ -1,0 +1,252 @@
+MacFlow tool matrix — 2026-11-27 13:04:14 +0000
+
+PASS  Photo Ü 1.jpg · Compress → Photo Ü 1-compressed.jpg  (9 KB → 4 KB (−55%))
+PASS  Photo Ü 1.jpg · Metadata → Photo Ü 1-metadata.jpg  (Image data untouched)
+PASS  Photo Ü 1.jpg · Edit → Photo Ü 1-edited.jpg
+PASS  Photo Ü 1.jpg · Crop → Photo Ü 1-cropped.jpg
+PASS  Photo Ü 1.jpg · Rotate → Photo Ü 1-rotated.jpg  (Rotated losslessly)
+PASS  Photo Ü 1.jpg · Redact → Photo Ü 1-redacted.jpg  (Metadata removed)
+PASS  Photo Ü 1.jpg · Add Background → Photo Ü 1-background.jpg
+PASS  Photo Ü 1.jpg · Resize → Photo Ü 1-resized.jpg
+PASS  Photo Ü 1.jpg · Remove Background → Photo Ü 1-cutout.png
+PASS  Photo Ü 1.jpg · Annotate → Photo Ü 1-annotated.jpg
+PASS  Photo Ü 1.jpg · Make PDF → Photo Ü 1.pdf
+PASS  alpha.png · Compress → alpha-compressed.png  (40 KB → 13 KB (−68%))
+PASS  alpha.png · Metadata → alpha-metadata.png  (Image data untouched)
+PASS  alpha.png · Edit → alpha-edited.png
+PASS  alpha.png · Crop → alpha-cropped.png
+PASS  alpha.png · Rotate → alpha-rotated.png
+PASS  alpha.png · Redact → alpha-redacted.png  (Metadata removed)
+PASS  alpha.png · Add Background → alpha-background.png
+PASS  alpha.png · Resize → alpha-resized.png
+PASS  alpha.png · Remove Background → alpha-cutout.png
+PASS  alpha.png · Annotate → alpha-annotated.png
+PASS  alpha.png · Make PDF → alpha.pdf
+PASS  photo.heic · Compress → photo-compressed.heic  (4 KB → 2 KB (−49%))
+PASS  photo.heic · Metadata → photo-metadata.heic  (Image data untouched)
+PASS  photo.heic · Edit → photo-edited.heic
+PASS  photo.heic · Crop → photo-cropped.heic
+PASS  photo.heic · Rotate → photo-rotated.heic  (Rotated losslessly)
+PASS  photo.heic · Redact → photo-redacted.heic  (Metadata removed)
+PASS  photo.heic · Add Background → photo-background.heic
+PASS  photo.heic · Resize → photo-resized.heic
+PASS  photo.heic · Remove Background → photo-cutout.png
+PASS  photo.heic · Annotate → photo-annotated.heic
+PASS  photo.heic · Make PDF → photo.pdf
+PASS  photo.bmp · Compress → photo-compressed.bmp  (307 KB → 58 KB (−81%))
+PASS  photo.bmp · Edit → photo-edited.bmp
+PASS  photo.bmp · Crop → photo-cropped.bmp
+PASS  photo.bmp · Rotate → photo-rotated.bmp
+PASS  photo.bmp · Redact → photo-redacted.bmp  (Metadata removed)
+PASS  photo.bmp · Add Background → photo-background.bmp
+PASS  photo.bmp · Resize → photo-resized.bmp
+PASS  photo.bmp · Remove Background → photo-cutout.png
+PASS  photo.bmp · Annotate → photo-annotated.bmp
+PASS  photo.bmp · Make PDF → photo (2).pdf
+PASS  photo.avif · Compress → photo-compressed.avif  (4 KB → 3 KB (−12%))
+PASS  photo.avif · Edit → photo-edited.avif
+PASS  photo.avif · Crop → photo-cropped.avif
+PASS  photo.avif · Rotate → photo-rotated.avif
+PASS  photo.avif · Redact → photo-redacted.avif  (Metadata removed)
+PASS  photo.avif · Add Background → photo-background.avif
+PASS  photo.avif · Resize → photo-resized.avif
+PASS  photo.avif · Remove Background → photo-cutout.png
+PASS  photo.avif · Annotate → photo-annotated.avif
+PASS  photo.avif · Make PDF → photo (3).pdf
+PASS  photo.jp2 · Compress → photo-compressed.jp2  (6 KB → 7 KB (−0%))
+PASS  photo.jp2 · Edit → photo-edited.jp2
+PASS  photo.jp2 · Crop → photo-cropped.jp2
+PASS  photo.jp2 · Rotate → photo-rotated.jp2
+PASS  photo.jp2 · Redact → photo-redacted.jp2  (Metadata removed)
+PASS  photo.jp2 · Add Background → photo-background.jp2
+PASS  photo.jp2 · Resize → photo-resized.jp2
+PASS  photo.jp2 · Remove Background → photo-cutout.png
+PASS  photo.jp2 · Annotate → photo-annotated.jp2
+PASS  photo.jp2 · Make PDF → photo (4).pdf
+PASS  icon.ico · Compress → icon-compressed.png  (17 KB → 2 KB (−89%))
+PASS  icon.ico · Edit → icon-edited.png
+PASS  icon.ico · Crop → icon-cropped.png
+PASS  icon.ico · Rotate → icon-rotated.png
+PASS  icon.ico · Redact → icon-redacted.png  (Metadata removed)
+PASS  icon.ico · Add Background → icon-background.png
+PASS  icon.ico · Resize → icon-resized.png
+PASS  icon.ico · Remove Background → icon-cutout.png
+PASS  icon.ico · Annotate → icon-annotated.png
+PASS  icon.ico · Make PDF → icon.pdf
+PASS  icon.icns · Compress → icon-compressed.png  (133 KB → 32 KB (−75%))
+PASS  icon.icns · Edit → icon-edited.png
+PASS  icon.icns · Crop → icon-cropped.png
+PASS  icon.icns · Rotate → icon-rotated.png
+PASS  icon.icns · Redact → icon-redacted.png  (Metadata removed)
+PASS  icon.icns · Add Background → icon-background.png
+PASS  icon.icns · Resize → icon-resized.png
+PASS  icon.icns · Remove Background → icon-cutout.png
+PASS  icon.icns · Annotate → icon-annotated.png
+PASS  icon.icns · Make PDF → icon (2).pdf
+PASS  layer.psd · Compress → layer-compressed.png  (165 KB → 13 KB (−91%))
+PASS  layer.psd · Edit → layer-edited.png
+PASS  layer.psd · Crop → layer-cropped.png
+PASS  layer.psd · Rotate → layer-rotated.png
+PASS  layer.psd · Redact → layer-redacted.png  (Metadata removed)
+PASS  layer.psd · Add Background → layer-background.png
+PASS  layer.psd · Resize → layer-resized.png
+PASS  layer.psd · Remove Background → layer-cutout.png
+PASS  layer.psd · Annotate → layer-annotated.png
+PASS  layer.psd · Make PDF → layer.pdf
+PASS  photo.tga · Compress → photo-compressed.png  (116 KB → 12 KB (−89%))
+PASS  photo.tga · Edit → photo-edited.png
+PASS  photo.tga · Crop → photo-cropped.png
+PASS  photo.tga · Rotate → photo-rotated.png
+PASS  photo.tga · Redact → photo-redacted.png  (Metadata removed)
+PASS  photo.tga · Add Background → photo-background.png
+PASS  photo.tga · Resize → photo-resized.png
+PASS  photo.tga · Remove Background → photo-cutout.png
+PASS  photo.tga · Annotate → photo-annotated.png
+PASS  photo.tga · Make PDF → photo (5).pdf
+PASS  pages.tiff · Compress → pages-compressed.tiff  (2 MB → 257 KB (−87%))
+PASS  pages.tiff · Metadata → pages-metadata.tiff  (Image data untouched)
+PASS  pages.tiff · Edit → pages-edited.tiff
+PASS  pages.tiff · Crop → pages-cropped.tiff
+PASS  pages.tiff · Rotate → pages-rotated.tiff
+PASS  pages.tiff · Redact → pages-redacted.tiff  (Metadata removed)
+PASS  pages.tiff · Add Background → pages-background.tiff
+PASS  pages.tiff · Resize → pages-resized.tiff
+PASS  pages.tiff · Remove Background → pages-cutout.png
+PASS  pages.tiff · Annotate → pages-annotated.tiff
+PASS  pages.tiff · Make PDF → pages.pdf
+PASS  anim.gif · Compress → anim-compressed.gif  (7 KB → 854 Byte (−88%))
+PASS  anim.gif · Edit → anim-edited.gif
+PASS  anim.gif · Crop → anim-cropped.gif
+PASS  anim.gif · Rotate → anim-rotated.gif
+PASS  anim.gif · Redact → anim-redacted.gif  (Metadata removed)
+PASS  anim.gif · Add Background → anim-background.png
+PASS  anim.gif · Resize → anim-resized.gif
+OK    anim.gif · Remove Background: refused honestly — No subject was found in this image.
+PASS  anim.gif · Annotate → anim-annotated.gif
+PASS  anim.gif · Make PDF → anim.pdf
+PASS  vector.svg · Compress → vector-compressed.png  (217 Byte → 5 KB (−0%))
+PASS  vector.svg · Edit → vector-edited.png
+PASS  vector.svg · Crop → vector-cropped.png
+PASS  vector.svg · Rotate → vector-rotated.png
+PASS  vector.svg · Redact → vector-redacted.png  (Metadata removed)
+PASS  vector.svg · Add Background → vector-background.png
+PASS  vector.svg · Resize → vector-resized.png
+OK    vector.svg · Remove Background: refused honestly — No subject was found in this image.
+PASS  vector.svg · Annotate → vector-annotated.png
+PASS  vector.svg · Make PDF → vector.pdf
+PASS  photo.webp · Compress → photo-compressed.webp  (3 KB → 2 KB (−15%))
+PASS  photo.webp · Edit → photo-edited.webp
+PASS  photo.webp · Crop → photo-cropped.webp
+PASS  photo.webp · Rotate → photo-rotated.webp
+PASS  photo.webp · Redact → photo-redacted.webp  (Metadata removed)
+PASS  photo.webp · Add Background → photo-background.webp
+PASS  photo.webp · Resize → photo-resized.webp
+PASS  photo.webp · Remove Background → photo-cutout.png
+PASS  photo.webp · Annotate → photo-annotated.webp
+PASS  photo.webp · Make PDF → photo (6).pdf
+PASS  misnamed.jpg · Compress → misnamed-compressed.png  (40 KB → 13 KB (−68%))
+PASS  misnamed.jpg · Metadata → misnamed-metadata.png  (Image data untouched)
+PASS  misnamed.jpg · Edit → misnamed-edited.png
+PASS  misnamed.jpg · Crop → misnamed-cropped.png
+PASS  misnamed.jpg · Rotate → misnamed-rotated.png
+PASS  misnamed.jpg · Redact → misnamed-redacted.png  (Metadata removed)
+PASS  misnamed.jpg · Add Background → misnamed-background.png
+PASS  misnamed.jpg · Resize → misnamed-resized.png
+PASS  misnamed.jpg · Remove Background → misnamed-cutout.png
+PASS  misnamed.jpg · Annotate → misnamed-annotated.png
+PASS  misnamed.jpg · Make PDF → misnamed.pdf
+OK    document.pdf · Compress: refused honestly — This PDF cannot be made smaller. It contains little image data or is already optimised.
+PASS  document.pdf · Organize Pages → document-pages.pdf
+PASS  document.pdf · Metadata → document-metadata.pdf
+PASS  document.pdf · Protect → document-protected.pdf
+PASS  document.pdf · Watermark → document-watermarked.pdf
+PASS  document.pdf · Page Numbers → document-numbered.pdf
+PASS  document.pdf · Recognise Text (OCR) → document-ocr.txt
+PASS  document.pdf · Split PDF → document (Split)  (4 PDFs)
+PASS  document.pdf · Extract Text → document.txt
+OK    scan.pdf · Compress: refused honestly — This PDF cannot be made smaller. It contains little image data or is already optimised.
+PASS  scan.pdf · Organize Pages → scan-pages.pdf
+PASS  scan.pdf · Metadata → scan-metadata.pdf
+PASS  scan.pdf · Protect → scan-protected.pdf
+PASS  scan.pdf · Watermark → scan-watermarked.pdf
+PASS  scan.pdf · Page Numbers → scan-numbered.pdf
+PASS  scan.pdf · Recognise Text (OCR) → scan-ocr.txt
+PASS  scan.pdf · Extract Text → scan.txt  (Text recognised with OCR — please check it.)
+PASS  data.json · Format JSON → data-formatted.json
+PASS  data.json · Minify JSON → data-min.json
+PASS  movie.srt · Shift Timing → movie-shifted.srt
+PASS  movie.vtt · Shift Timing → movie-shifted.vtt
+PASS  movie.sbv · Shift Timing → movie-shifted.sbv
+PASS  files.zip · Extract → archive-src
+PASS  files.zip · Archive Contents → archive-src
+PASS  files.zip · Test Archive →   (“files.zip” is intact — 2 files verified.)
+PASS  files.7z · Extract → archive-src
+PASS  files.7z · Archive Contents → archive-src
+PASS  files.7z · Test Archive →   (“files.7z” is intact — 2 files verified.)
+PASS  files.tar · Extract → archive-src
+PASS  files.tar · Archive Contents → archive-src
+PASS  files.tar · Test Archive →   (“files.tar” is intact — 2 files verified.)
+PASS  files.tar.gz · Extract → archive-src
+PASS  files.tar.gz · Archive Contents → archive-src
+PASS  files.tar.gz · Test Archive →   (“files.tar.gz” is intact — 2 files verified.)
+PASS  files.tar.bz2 · Extract → archive-src
+PASS  files.tar.bz2 · Archive Contents → archive-src
+PASS  files.tar.bz2 · Test Archive →   (“files.tar.bz2” is intact — 2 files verified.)
+PASS  files.tar.xz · Extract → archive-src
+PASS  files.tar.xz · Archive Contents → archive-src
+PASS  files.tar.xz · Test Archive →   (“files.tar.xz” is intact — 2 files verified.)
+PASS  clip.mov · Compress → clip-compressed.mov  (14 KB → 13 KB)
+PASS  clip.mov · Trim → clip-trimmed.mov
+PASS  clip.mov · Rotate → clip-rotated.mov  (Rotated without re-encoding)
+PASS  clip.mov · Mute → clip-muted.mov
+PASS  clip.mov · Extract Audio → clip.m4a
+PASS  clip.mov · Snapshot → clip-frame 00.01.png
+PASS  clip.mov · Change Speed → clip-2x.mov
+PASS  clip.mp4 · Compress → clip-compressed.mp4  (13 KB → 13 KB)
+PASS  clip.mp4 · Trim → clip-trimmed.mp4
+PASS  clip.mp4 · Rotate → clip-rotated.mp4  (Rotated without re-encoding)
+PASS  clip.mp4 · Mute → clip-muted.mp4
+PASS  clip.mp4 · Extract Audio → clip.m4a
+PASS  clip.mp4 · Snapshot → clip-frame 00.01.png
+PASS  clip.mp4 · Change Speed → clip-2x.mp4
+PASS  clip.m4v · Compress → clip-compressed.m4v  (13 KB → 13 KB)
+PASS  clip.m4v · Trim → clip-trimmed.m4v
+PASS  clip.m4v · Rotate → clip-rotated.m4v  (Rotated without re-encoding)
+PASS  clip.m4v · Mute → clip-muted.m4v
+PASS  clip.m4v · Extract Audio → clip.m4a
+PASS  clip.m4v · Snapshot → clip-frame 00.01.png
+PASS  clip.m4v · Change Speed → clip-2x.m4v
+PASS  tone.wav · Trim → tone-trimmed.wav
+PASS  tone.wav · Volume → tone-volume.wav
+PASS  tone.wav · Fade → tone-faded.wav
+PASS  tone.wav · Channels → tone-mono.wav
+PASS  tone.aiff · Trim → tone-trimmed.aiff
+PASS  tone.aiff · Volume → tone-volume.aiff
+PASS  tone.aiff · Fade → tone-faded.aiff
+PASS  tone.aiff · Channels → tone-mono.aiff
+PASS  tone.flac · Trim → tone-trimmed.flac
+PASS  tone.flac · Volume → tone-volume.flac
+PASS  tone.flac · Fade → tone-faded.flac
+PASS  tone.flac · Channels → tone-mono.flac
+PASS  tone.m4a · Trim → tone-trimmed.m4a
+PASS  tone.m4a · Volume → tone-volume.m4a
+PASS  tone.m4a · Fade → tone-faded.m4a
+PASS  tone.m4a · Channels → tone-mono.m4a
+PASS  tone.caf · Trim → tone-trimmed.caf
+PASS  tone.caf · Volume → tone-volume.caf
+PASS  tone.caf · Fade → tone-faded.caf
+PASS  tone.caf · Channels → tone-mono.caf
+PASS  tone.ogg · Trim → tone-trimmed.ogg
+PASS  tone.ogg · Volume → tone-volume.ogg
+PASS  tone.ogg · Fade → tone-faded.ogg
+PASS  tone.ogg · Channels → tone-mono.ogg
+PASS  tone.mp3 · Trim → tone-trimmed.mp3
+PASS  tone.mp3 · Volume → tone-volume.mp3
+PASS  tone.mp3 · Fade → tone-faded.mp3
+PASS  tone.mp3 · Channels → tone-mono.mp3
+PASS  tone.opus · Trim → tone-trimmed.m4a
+PASS  tone.opus · Volume → tone-volume.m4a
+PASS  tone.opus · Fade → tone-faded.m4a
+PASS  tone.opus · Channels → tone-mono.m4a
+
+PASSED 244  HONEST REFUSALS 4  FAILED 0

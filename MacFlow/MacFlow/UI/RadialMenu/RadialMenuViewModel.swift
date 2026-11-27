@@ -24,6 +24,11 @@ final class RadialMenuViewModel: ObservableObject {
     /// Segment chosen with the arrow keys; kept while the pointer rests in
     /// the neutral centre so a drop there commits it.
     private var keyboardSelectionID: String?
+    /// After a page flip the new MORE/BACK segment usually sits right under
+    /// the pointer. It stays inert until the pointer has visited another
+    /// segment or the centre, so the pages never flip back and forth on
+    /// their own. Deliberately invisible: the segment looks unchanged.
+    private(set) var pagerLocked = false
 
     init(mode: RadialMenuMode, config: RadialMenuConfiguration = .current()) {
         self.mode = mode
@@ -125,6 +130,8 @@ final class RadialMenuViewModel: ObservableObject {
     }
 
     private func changePage(_ newPage: Int) {
+        moreTimer?.invalidate()
+        pagerLocked = true
         withAnimation(.spring(response: 0.32, dampingFraction: 0.82)) {
             page = newPage
             layoutPage()
@@ -137,6 +144,8 @@ final class RadialMenuViewModel: ObservableObject {
     func updateHover(at point: CGPoint, in size: CGSize) {
         var id = segmentID(at: point, in: size)
         if id == nil, let keyboard = keyboardSelectionID { id = keyboard } else if id != nil { keyboardSelectionID = nil }
+        // Leaving the pager (another segment or the centre) re-arms it.
+        if pagerLocked, !isPager(id) { pagerLocked = false }
         guard id != hoveredSegmentID else { return }
         hoveredSegmentID = id
         updateLabels()
@@ -145,6 +154,7 @@ final class RadialMenuViewModel: ObservableObject {
 
     func clearHover() {
         keyboardSelectionID = nil
+        pagerLocked = false
         guard hoveredSegmentID != nil else { return }
         hoveredSegmentID = nil
         moreTimer?.invalidate()
@@ -201,9 +211,17 @@ final class RadialMenuViewModel: ObservableObject {
 
     // MARK: - Spring-loaded MORE
 
+    private func isPager(_ id: String?) -> Bool {
+        guard let id, let segment = segments.first(where: { $0.id == id }) else { return false }
+        switch segment.action {
+        case .more, .back: return true
+        default: return false
+        }
+    }
+
     private func scheduleSpringLoad() {
         moreTimer?.invalidate()
-        guard let segment = hoveredSegment else { return }
+        guard let segment = hoveredSegment, !pagerLocked else { return }
         switch segment.action {
         case .more, .back:
             let timer = Timer(timeInterval: 0.5, repeats: false) { [weak self] _ in

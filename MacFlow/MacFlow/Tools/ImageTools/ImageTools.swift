@@ -433,74 +433,285 @@ enum ImageTools {
         return out
     }
 
-    /// Current values of the editable fields.
+    /// Current values of the editable fields. Read through the XMP view of
+    /// ImageIO, which unifies EXIF, TIFF, IPTC and XMP for every format
+    /// (PNG keeps text in XMP only).
     static func readFields(_ url: URL) -> [MetadataField: String] {
-        guard let source = try? ImageEngine.makeSource(url),
-              let props = CGImageSourceCopyPropertiesAtIndex(source, ImageEngine.primaryIndex(source), nil) as? [CFString: Any] else { return [:] }
-        let tiff = props[kCGImagePropertyTIFFDictionary] as? [CFString: Any] ?? [:]
-        let exif = props[kCGImagePropertyExifDictionary] as? [CFString: Any] ?? [:]
-        let iptc = props[kCGImagePropertyIPTCDictionary] as? [CFString: Any] ?? [:]
-        let gps = props[kCGImagePropertyGPSDictionary] as? [CFString: Any] ?? [:]
+        guard let source = try? ImageEngine.makeSource(url) else { return [:] }
+        let index = ImageEngine.primaryIndex(source)
+        let props = CGImageSourceCopyPropertiesAtIndex(source, index, nil) as? [CFString: Any] ?? [:]
+        let meta = CGImageSourceCopyMetadataAtIndex(source, index, nil)
+        func xmp(_ dict: CFString, _ key: CFString, joiner: String = ", ") -> String? {
+            guard let meta, let tag = CGImageMetadataCopyTagMatchingImageProperty(meta, dict, key) else { return nil }
+            let values = metadataStrings(CGImageMetadataTagCopyValue(tag))
+            let joined = values.joined(separator: joiner)
+            return joined.isEmpty ? nil : joined
+        }
         var fields: [MetadataField: String] = [:]
-        fields[.title] = iptc[kCGImagePropertyIPTCObjectName] as? String
-        fields[.description] = (tiff[kCGImagePropertyTIFFImageDescription] as? String) ?? (iptc[kCGImagePropertyIPTCCaptionAbstract] as? String)
-        fields[.author] = (tiff[kCGImagePropertyTIFFArtist] as? String) ?? (iptc[kCGImagePropertyIPTCByline] as? [String])?.joined(separator: ", ")
-        fields[.copyright] = (tiff[kCGImagePropertyTIFFCopyright] as? String) ?? (iptc[kCGImagePropertyIPTCCopyrightNotice] as? String)
-        fields[.keywords] = (iptc[kCGImagePropertyIPTCKeywords] as? [String])?.joined(separator: ", ")
-        fields[.dateTaken] = exif[kCGImagePropertyExifDateTimeOriginal] as? String
-        fields[.make] = tiff[kCGImagePropertyTIFFMake] as? String
-        fields[.model] = tiff[kCGImagePropertyTIFFModel] as? String
-        if let lat = gps[kCGImagePropertyGPSLatitude] as? Double, let ref = gps[kCGImagePropertyGPSLatitudeRef] as? String {
-            fields[.latitude] = String(format: "%.6f", ref == "S" ? -lat : lat)
+        fields[.title] = xmp(kCGImagePropertyIPTCDictionary, kCGImagePropertyIPTCObjectName)
+        fields[.description] = xmp(kCGImagePropertyTIFFDictionary, kCGImagePropertyTIFFImageDescription)
+        fields[.author] = xmp(kCGImagePropertyTIFFDictionary, kCGImagePropertyTIFFArtist)
+        fields[.copyright] = xmp(kCGImagePropertyIPTCDictionary, kCGImagePropertyIPTCCopyrightNotice)
+        fields[.keywords] = xmp(kCGImagePropertyIPTCDictionary, kCGImagePropertyIPTCKeywords)
+        if let date = xmp(kCGImagePropertyExifDictionary, kCGImagePropertyExifDateTimeOriginal) {
+            fields[.dateTaken] = exifDate(date)
         }
-        if let lon = gps[kCGImagePropertyGPSLongitude] as? Double, let ref = gps[kCGImagePropertyGPSLongitudeRef] as? String {
-            fields[.longitude] = String(format: "%.6f", ref == "W" ? -lon : lon)
+        fields[.make] = xmp(kCGImagePropertyTIFFDictionary, kCGImagePropertyTIFFMake)
+        fields[.model] = xmp(kCGImagePropertyTIFFDictionary, kCGImagePropertyTIFFModel)
+        let gps = props[kCGImagePropertyGPSDictionary] as? [CFString: Any] ?? [:]
+        func coordinate(_ value: Any?, _ ref: Any?, negative: String) -> String? {
+            let number = (value as? Double) ?? (value as? String).flatMap(Double.init)
+            guard let number else { return nil }
+            return String(format: "%.6f", (ref as? String) == negative ? -number : number)
         }
-        return fields.filter { !($0.value.isEmpty) }
+        fields[.latitude] = coordinate(gps[kCGImagePropertyGPSLatitude], gps[kCGImagePropertyGPSLatitudeRef], negative: "S")
+            ?? xmp(kCGImagePropertyGPSDictionary, kCGImagePropertyGPSLatitude).flatMap(xmpCoordinate)
+        fields[.longitude] = coordinate(gps[kCGImagePropertyGPSLongitude], gps[kCGImagePropertyGPSLongitudeRef], negative: "W")
+            ?? xmp(kCGImagePropertyGPSDictionary, kCGImagePropertyGPSLongitude).flatMap(xmpCoordinate)
+        return fields.filter { !$0.value.isEmpty }
     }
 
-    /// Writes edited metadata without re-encoding the image data.
+    /// Flattens XMP values (strings, arrays, language alternatives).
+    static func metadataStrings(_ value: CFTypeRef?) -> [String] {
+        guard let value else { return [] }
+        if let s = value as? String { return [s] }
+        if let n = value as? NSNumber { return [n.stringValue] }
+        if let tags = value as? [CGImageMetadataTag] { return tags.flatMap { metadataStrings(CGImageMetadataTagCopyValue($0)) } }
+        if let dict = value as? [String: CGImageMetadataTag] {
+            if let preferred = dict["x-default"] { return metadataStrings(CGImageMetadataTagCopyValue(preferred)) }
+            return dict.keys.sorted().flatMap { metadataStrings(CGImageMetadataTagCopyValue(dict[$0]!)) }
+        }
+        if CFGetTypeID(value) == CGImageMetadataTagGetTypeID() { return metadataStrings(CGImageMetadataTagCopyValue(value as! CGImageMetadataTag)) }
+        return []
+    }
+
+    /// XMP dates ("2024-05-31T14:30:00") shown in EXIF form ("2024:05:31 14:30:00").
+    static func exifDate(_ value: String) -> String {
+        guard value.count >= 19, value.contains("-") else { return value }
+        let chars = Array(value.prefix(19))
+        return String(chars[0..<4]) + ":" + String(chars[5..<7]) + ":" + String(chars[8..<10]) + " " + String(chars[11..<19])
+    }
+
+    /// XMP GPS coordinate "47,22.2N" → "47.370000".
+    static func xmpCoordinate(_ value: String) -> String? {
+        guard let ref = value.last, "NSEW".contains(ref) else { return nil }
+        let parts = value.dropLast().split(separator: ",").compactMap { Double($0) }
+        guard !parts.isEmpty else { return nil }
+        var degrees = parts[0]
+        if parts.count > 1 { degrees += parts[1] / 60 }
+        if parts.count > 2 { degrees += parts[2] / 3600 }
+        if ref == "S" || ref == "W" { degrees = -degrees }
+        return String(format: "%.6f", degrees)
+    }
+
+    /// Writes edited metadata. JPEG, HEIC, PNG and TIFF are updated without
+    /// re-encoding the image data (TIFF GPS uses a second lossless pass).
     static func writeMetadata(source url: URL, edit: MetadataEdit, destination: URL) throws {
         let source = try ImageEngine.makeSource(url)
         let index = ImageEngine.primaryIndex(source)
-        guard let type = CGImageSourceGetType(source),
-              let dest = CGImageDestinationCreateWithURL(destination as CFURL, type, 1, nil) else {
-            throw MacFlowError.encode("image")
+        guard let type = CGImageSourceGetType(source) else { throw MacFlowError.encode("image") }
+        // PNG and TIFF keep EXIF/TIFF tags outside XMP, which a metadata copy
+        // does not rewrite; they are lossless, so a property pass is used.
+        if (type as String) == "public.png" || (type as String) == "public.tiff" {
+            try writeMetadataByProperties(source: source, index: index, type: type, edit: edit, destination: destination)
+            return
         }
+        let isTIFF = (type as String) == "public.tiff"
         let orientation = Int(ImageEngine.orientation(of: source, index: index))
         let metadata: CGMutableImageMetadata
-        if edit.removeAll {
+        if edit.removeAll, let existing = CGImageSourceCopyMetadataAtIndex(source, index, nil), let copy = CGImageMetadataCreateMutableCopy(existing) {
+            // An empty replacement is ignored by the HEIC writer; removing every
+            // tag explicitly works for all formats.
+            metadata = copy
+            for tag in (CGImageMetadataCopyTags(copy) as? [CGImageMetadataTag]) ?? [] {
+                guard let prefix = CGImageMetadataTagCopyPrefix(tag), let name = CGImageMetadataTagCopyName(tag) else { continue }
+                CGImageMetadataRemoveTagWithPath(copy, nil, "\(prefix):\(name)" as CFString)
+            }
+        } else if edit.removeAll {
             metadata = CGImageMetadataCreateMutable()
         } else if let existing = CGImageSourceCopyMetadataAtIndex(source, index, nil), let copy = CGImageMetadataCreateMutableCopy(existing) {
             metadata = copy
         } else {
             metadata = CGImageMetadataCreateMutable()
         }
+        var gpsForTIFF: [CFString: Any] = [:]
         if !edit.removeAll {
             for path in edit.removedPaths {
                 CGImageMetadataRemoveTagWithPath(metadata, nil, path as CFString)
             }
+            // Coordinates are applied together so the reference letters match.
+            var coordinates: [MetadataField: String] = [:]
             for (field, rawValue) in edit.fields {
-                try apply(field, value: rawValue.trimmingCharacters(in: .whitespacesAndNewlines), to: metadata)
+                let value = rawValue.trimmingCharacters(in: .whitespacesAndNewlines)
+                if field == .latitude || field == .longitude { coordinates[field] = value; continue }
+                try apply(field, value: value, to: metadata)
+            }
+            if !coordinates.isEmpty {
+                gpsForTIFF = try applyCoordinates(coordinates, to: metadata)
             }
             if edit.removeLocation {
                 for name in gpsTagNames(metadata) { CGImageMetadataRemoveTagWithPath(metadata, nil, name as CFString) }
+                gpsForTIFF = [:]
             }
         }
-        // Keep the photo upright even when everything else is removed.
-        if orientation != 1 {
+        // Keep the photo upright even when everything else is removed. With
+        // "remove all" the tag is always written: the HEIC writer ignores a
+        // completely empty replacement.
+        if orientation != 1 || edit.removeAll {
             CGImageMetadataSetValueMatchingImageProperty(metadata, kCGImagePropertyTIFFDictionary, kCGImagePropertyTIFFOrientation, orientation as CFNumber)
+        }
+        if isTIFF {
+            // The copy pass drops TIFF GPS: carry the existing location over
+            // (with any edits) unless the user removes it.
+            var location = (CGImageSourceCopyPropertiesAtIndex(source, index, nil) as? [CFString: Any])?[kCGImagePropertyGPSDictionary] as? [CFString: Any] ?? [:]
+            for (key, value) in gpsForTIFF { location[key] = value }
+            for (field, keys) in [(MetadataField.latitude, [kCGImagePropertyGPSLatitude, kCGImagePropertyGPSLatitudeRef]),
+                                  (.longitude, [kCGImagePropertyGPSLongitude, kCGImagePropertyGPSLongitudeRef])]
+                where edit.fields[field]?.trimmingCharacters(in: .whitespaces).isEmpty == true {
+                for key in keys { location.removeValue(forKey: key) }
+            }
+            gpsForTIFF = (edit.removeAll || edit.removeLocation) ? [:] : location
+        }
+        // Standard XMP edit stamp. It also guarantees the XMP block is
+        // rewritten: ImageIO leaves XMP untouched when the replacement holds
+        // no XMP-only tag, so cleared fields would otherwise survive in HEIC.
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime]
+        if let stamp = CGImageMetadataTagCreate(kCGImageMetadataNamespaceXMPBasic, kCGImageMetadataPrefixXMPBasic, "MetadataDate" as CFString,
+                                                .string, formatter.string(from: Date()) as CFString) {
+            CGImageMetadataSetTagWithPath(metadata, nil, "xmp:MetadataDate" as CFString, stamp)
         }
         var options: [CFString: Any] = [
             kCGImageDestinationMetadata: metadata,
             kCGImageDestinationMergeMetadata: false,
         ]
         if edit.removeAll || edit.removeLocation { options[kCGImageMetadataShouldExcludeGPS] = true }
-        if edit.removeAll { options[kCGImageMetadataShouldExcludeXMP] = false }
+        let firstPass = isTIFF && !gpsForTIFF.isEmpty
+            ? destination.deletingLastPathComponent().appendingPathComponent("metadata-pass-\(UUID().uuidString).tiff")
+            : destination
+        defer { if firstPass != destination { try? FileManager.default.removeItem(at: firstPass) } }
+        guard let dest = CGImageDestinationCreateWithURL(firstPass as CFURL, type, 1, nil) else { throw MacFlowError.encode("image") }
         var error: Unmanaged<CFError>?
         guard CGImageDestinationCopyImageSource(dest, source, options as CFDictionary, &error) else {
             throw MacFlowError("The metadata could not be written.", detail: error?.takeRetainedValue().localizedDescription)
         }
+        if firstPass != destination {
+            // TIFF: ImageIO drops GPS when copying; add it in a lossless pass.
+            let pass = try ImageEngine.makeSource(firstPass)
+            guard let final = CGImageDestinationCreateWithURL(destination as CFURL, type, 1, nil) else { throw MacFlowError.encode("TIFF") }
+            CGImageDestinationAddImageFromSource(final, pass, 0, [kCGImagePropertyGPSDictionary: gpsForTIFF] as CFDictionary)
+            guard CGImageDestinationFinalize(final) else { throw MacFlowError.encode("TIFF") }
+        }
+    }
+
+    /// PNG/TIFF: rewrites the image from its source with an explicit set of
+    /// property dictionaries. Removed keys are set to kCFNull, XMP is dropped
+    /// so no stale copy can shadow the new values.
+    private static func writeMetadataByProperties(source: CGImageSource, index: Int, type: CFString, edit: MetadataEdit, destination: URL) throws {
+        let original = CGImageSourceCopyPropertiesAtIndex(source, index, nil) as? [CFString: Any] ?? [:]
+        let groups = [kCGImagePropertyTIFFDictionary, kCGImagePropertyExifDictionary, kCGImagePropertyGPSDictionary, kCGImagePropertyIPTCDictionary]
+        var dicts: [CFString: [CFString: Any]] = [:]
+        for group in groups { dicts[group] = original[group] as? [CFString: Any] ?? [:] }
+        let orientation = (original[kCGImagePropertyOrientation] as? Int) ?? 1
+        let structural: Set<String> = [kCGImagePropertyTIFFOrientation as String, kCGImagePropertyExifPixelXDimension as String,
+                                       kCGImagePropertyExifPixelYDimension as String, kCGImagePropertyExifColorSpace as String]
+        func clear(_ group: CFString, _ key: CFString) { dicts[group]?[key] = nil }
+        func put(_ group: CFString, _ key: CFString, _ value: Any?) { if let value { dicts[group]?[key] = value } else { clear(group, key) } }
+
+        if edit.removeAll {
+            for group in groups {
+                dicts[group] = dicts[group]?.filter { structural.contains($0.key as String) } ?? [:]
+            }
+        } else {
+            // Single tags chosen in the list: map their XMP path back to properties.
+            if !edit.removedPaths.isEmpty, let meta = CGImageSourceCopyMetadataAtIndex(source, index, nil) {
+                for group in groups {
+                    for key in dicts[group]?.keys.map({ $0 }) ?? [] {
+                        guard let tag = CGImageMetadataCopyTagMatchingImageProperty(meta, group, key),
+                              let prefix = CGImageMetadataTagCopyPrefix(tag), let name = CGImageMetadataTagCopyName(tag),
+                              edit.removedPaths.contains("\(prefix):\(name)") else { continue }
+                        clear(group, key)
+                        if group == kCGImagePropertyGPSDictionary { dicts[group] = [:] }
+                    }
+                }
+            }
+            for (field, raw) in edit.fields {
+                let value = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+                let text: String? = value.isEmpty ? nil : value
+                switch field {
+                case .title: put(kCGImagePropertyIPTCDictionary, kCGImagePropertyIPTCObjectName, text)
+                case .description:
+                    put(kCGImagePropertyTIFFDictionary, kCGImagePropertyTIFFImageDescription, text)
+                    put(kCGImagePropertyIPTCDictionary, kCGImagePropertyIPTCCaptionAbstract, text)
+                case .author:
+                    let names = value.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty }
+                    put(kCGImagePropertyTIFFDictionary, kCGImagePropertyTIFFArtist, names.isEmpty ? nil : names.joined(separator: ", "))
+                    put(kCGImagePropertyIPTCDictionary, kCGImagePropertyIPTCByline, names.isEmpty ? nil : names)
+                case .copyright:
+                    put(kCGImagePropertyTIFFDictionary, kCGImagePropertyTIFFCopyright, text)
+                    put(kCGImagePropertyIPTCDictionary, kCGImagePropertyIPTCCopyrightNotice, text)
+                case .keywords:
+                    let words = value.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty }
+                    put(kCGImagePropertyIPTCDictionary, kCGImagePropertyIPTCKeywords, words.isEmpty ? nil : words)
+                case .dateTaken:
+                    if let text, text.range(of: #"^\d{4}:\d{2}:\d{2} \d{2}:\d{2}:\d{2}$"#, options: .regularExpression) == nil {
+                        throw MacFlowError("“Date Taken” must look like 2024:05:31 14:30:00.")
+                    }
+                    put(kCGImagePropertyExifDictionary, kCGImagePropertyExifDateTimeOriginal, text)
+                case .make: put(kCGImagePropertyTIFFDictionary, kCGImagePropertyTIFFMake, text)
+                case .model: put(kCGImagePropertyTIFFDictionary, kCGImagePropertyTIFFModel, text)
+                case .latitude, .longitude:
+                    let isLat = field == .latitude
+                    let key = isLat ? kCGImagePropertyGPSLatitude : kCGImagePropertyGPSLongitude
+                    let refKey = isLat ? kCGImagePropertyGPSLatitudeRef : kCGImagePropertyGPSLongitudeRef
+                    guard let text else { clear(kCGImagePropertyGPSDictionary, key); clear(kCGImagePropertyGPSDictionary, refKey); continue }
+                    guard let number = Double(text.replacingOccurrences(of: ",", with: ".")), abs(number) <= (isLat ? 90 : 180) else {
+                        throw MacFlowError("\(field.label) must be a number between \(isLat ? "-90 and 90" : "-180 and 180").")
+                    }
+                    put(kCGImagePropertyGPSDictionary, key, abs(number))
+                    put(kCGImagePropertyGPSDictionary, refKey, isLat ? (number < 0 ? "S" : "N") : (number < 0 ? "W" : "E"))
+                }
+            }
+            if edit.removeLocation { dicts[kCGImagePropertyGPSDictionary] = [:] }
+        }
+        // Explicit nulls remove whatever the source carried for a key.
+        var properties: [CFString: Any] = [kCGImagePropertyOrientation: orientation]
+        for group in groups {
+            var merged: [CFString: Any] = [:]
+            for key in (original[group] as? [CFString: Any])?.keys.map({ $0 }) ?? [] { merged[key] = kCFNull }
+            for (key, value) in dicts[group] ?? [:] { merged[key] = value }
+            if dicts[group]?.isEmpty ?? true, group != kCGImagePropertyTIFFDictionary {
+                properties[group] = kCFNull
+            } else {
+                properties[group] = merged
+            }
+        }
+        if var tiff = properties[kCGImagePropertyTIFFDictionary] as? [CFString: Any] {
+            tiff[kCGImagePropertyTIFFOrientation] = orientation
+            properties[kCGImagePropertyTIFFDictionary] = tiff
+        }
+        // PNG mirrors author, title, description and copyright in its own
+        // text chunks; keep them in step with the edited values.
+        if (type as String) == "public.png" {
+            var png = (original[kCGImagePropertyPNGDictionary] as? [CFString: Any]) ?? [:]
+            let textKeys: [CFString] = [kCGImagePropertyPNGAuthor, kCGImagePropertyPNGTitle, kCGImagePropertyPNGDescription, kCGImagePropertyPNGCopyright,
+                                        kCGImagePropertyPNGComment, kCGImagePropertyPNGDisclaimer, kCGImagePropertyPNGSource, kCGImagePropertyPNGWarning,
+                                        kCGImagePropertyPNGSoftware, kCGImagePropertyPNGCreationTime, kCGImagePropertyPNGModificationTime]
+            func text(_ group: CFString, _ key: CFString) -> Any { (dicts[group]?[key] as? String).map { $0 as Any } ?? kCFNull! }
+            if edit.removeAll {
+                for key in textKeys { png[key] = kCFNull }
+            } else {
+                png[kCGImagePropertyPNGAuthor] = text(kCGImagePropertyTIFFDictionary, kCGImagePropertyTIFFArtist)
+                png[kCGImagePropertyPNGTitle] = text(kCGImagePropertyIPTCDictionary, kCGImagePropertyIPTCObjectName)
+                png[kCGImagePropertyPNGDescription] = text(kCGImagePropertyTIFFDictionary, kCGImagePropertyTIFFImageDescription)
+                png[kCGImagePropertyPNGCopyright] = text(kCGImagePropertyTIFFDictionary, kCGImagePropertyTIFFCopyright)
+            }
+            properties[kCGImagePropertyPNGDictionary] = png
+        }
+        properties[kCGImageMetadataShouldExcludeXMP] = true
+        guard let dest = CGImageDestinationCreateWithURL(destination as CFURL, type, 1, nil) else { throw MacFlowError.encode("image") }
+        CGImageDestinationAddImageFromSource(dest, source, index, properties as CFDictionary)
+        guard CGImageDestinationFinalize(dest) else { throw MacFlowError("The metadata could not be written.") }
     }
 
     private static func gpsTagNames(_ metadata: CGImageMetadata) -> [String] {
@@ -511,54 +722,105 @@ enum ImageTools {
         }
     }
 
-    private static func apply(_ field: MetadataField, value: String, to metadata: CGMutableImageMetadata) throws {
-        func set(_ dict: CFString, _ key: CFString, _ v: CFTypeRef?) {
-            if let v {
-                CGImageMetadataSetValueMatchingImageProperty(metadata, dict, key, v)
-            } else if let tag = CGImageMetadataCopyTagMatchingImageProperty(metadata, dict, key),
-                      let prefix = CGImageMetadataTagCopyPrefix(tag), let name = CGImageMetadataTagCopyName(tag) {
-                CGImageMetadataRemoveTagWithPath(metadata, nil, "\(prefix):\(name)" as CFString)
-            }
+    /// Builds a well-formed XMP tag (Seq, Bag or language Alt) through
+    /// ImageIO's own XMP parser. Setting plain strings on these array types
+    /// produces malformed metadata that ImageIO's HEIC writer cannot handle.
+    private static func parsedTag(_ name: String, container: String, values: [String]) -> CGImageMetadataTag? {
+        func escape(_ s: String) -> String {
+            s.replacingOccurrences(of: "&", with: "&amp;").replacingOccurrences(of: "<", with: "&lt;")
+                .replacingOccurrences(of: ">", with: "&gt;").replacingOccurrences(of: "\"", with: "&quot;")
         }
-        let v: CFString? = value.isEmpty ? nil : value as CFString
+        let lang = container == "Alt" ? " xml:lang=\"x-default\"" : ""
+        let items = values.map { "<rdf:li\(lang)>\(escape($0))</rdf:li>" }.joined()
+        let packet = "<x:xmpmeta xmlns:x=\"adobe:ns:meta/\"><rdf:RDF xmlns:rdf=\"http://www.w3.org/1999/02/22-rdf-syntax-ns#\">"
+            + "<rdf:Description rdf:about=\"\" xmlns:dc=\"http://purl.org/dc/elements/1.1/\">"
+            + "<dc:\(name)><rdf:\(container)>\(items)</rdf:\(container)></dc:\(name)></rdf:Description></rdf:RDF></x:xmpmeta>"
+        guard let parsed = CGImageMetadataCreateFromXMPData(Data(packet.utf8) as CFData) else { return nil }
+        return CGImageMetadataCopyTagWithPath(parsed, nil, "dc:\(name)" as CFString)
+    }
+
+    private static func removeTwins(_ paths: [String], from metadata: CGMutableImageMetadata) {
+        for path in paths { CGImageMetadataRemoveTagWithPath(metadata, nil, path as CFString) }
+    }
+
+    private static func setDublinCore(_ name: String, container: String, values: [String], in metadata: CGMutableImageMetadata) throws {
+        guard !values.isEmpty else { return }
+        guard let tag = parsedTag(name, container: container, values: values),
+              CGImageMetadataSetTagWithPath(metadata, nil, "dc:\(name)" as CFString, tag) else {
+            throw MacFlowError("The \(name) field could not be written.")
+        }
+    }
+
+    private static func removeMatching(_ dict: CFString, _ key: CFString, from metadata: CGMutableImageMetadata) {
+        // Several XMP tags can map to one property; remove until none is left.
+        for _ in 0..<4 {
+            guard let tag = CGImageMetadataCopyTagMatchingImageProperty(metadata, dict, key),
+                  let prefix = CGImageMetadataTagCopyPrefix(tag), let name = CGImageMetadataTagCopyName(tag) else { return }
+            CGImageMetadataRemoveTagWithPath(metadata, nil, "\(prefix):\(name)" as CFString)
+        }
+    }
+
+    private static func apply(_ field: MetadataField, value: String, to metadata: CGMutableImageMetadata) throws {
         switch field {
         case .title:
-            set(kCGImagePropertyIPTCDictionary, kCGImagePropertyIPTCObjectName, v)
+            removeTwins(["dc:title"], from: metadata)
+            try setDublinCore("title", container: "Alt", values: value.isEmpty ? [] : [value], in: metadata)
         case .description:
-            set(kCGImagePropertyTIFFDictionary, kCGImagePropertyTIFFImageDescription, v)
-            set(kCGImagePropertyIPTCDictionary, kCGImagePropertyIPTCCaptionAbstract, v)
+            removeTwins(["dc:description", "tiff:ImageDescription"], from: metadata)
+            try setDublinCore("description", container: "Alt", values: value.isEmpty ? [] : [value], in: metadata)
         case .author:
-            set(kCGImagePropertyTIFFDictionary, kCGImagePropertyTIFFArtist, v)
-            set(kCGImagePropertyIPTCDictionary, kCGImagePropertyIPTCByline, value.isEmpty ? nil : [value] as CFArray)
+            removeTwins(["dc:creator", "tiff:Artist"], from: metadata)
+            let names = value.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty }
+            try setDublinCore("creator", container: "Seq", values: names, in: metadata)
         case .copyright:
-            set(kCGImagePropertyTIFFDictionary, kCGImagePropertyTIFFCopyright, v)
-            set(kCGImagePropertyIPTCDictionary, kCGImagePropertyIPTCCopyrightNotice, v)
+            removeTwins(["dc:rights", "tiff:Copyright"], from: metadata)
+            try setDublinCore("rights", container: "Alt", values: value.isEmpty ? [] : [value], in: metadata)
         case .keywords:
+            removeTwins(["dc:subject"], from: metadata)
             let words = value.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty }
-            set(kCGImagePropertyIPTCDictionary, kCGImagePropertyIPTCKeywords, words.isEmpty ? nil : words as CFArray)
+            try setDublinCore("subject", container: "Bag", values: words, in: metadata)
         case .dateTaken:
             if !value.isEmpty, value.range(of: #"^\d{4}:\d{2}:\d{2} \d{2}:\d{2}:\d{2}$"#, options: .regularExpression) == nil {
                 throw MacFlowError("“Date Taken” must look like 2024:05:31 14:30:00.")
             }
-            set(kCGImagePropertyExifDictionary, kCGImagePropertyExifDateTimeOriginal, v)
-        case .make:
-            set(kCGImagePropertyTIFFDictionary, kCGImagePropertyTIFFMake, v)
-        case .model:
-            set(kCGImagePropertyTIFFDictionary, kCGImagePropertyTIFFModel, v)
-        case .latitude, .longitude:
-            let isLat = field == .latitude
-            if value.isEmpty {
-                set(kCGImagePropertyGPSDictionary, isLat ? kCGImagePropertyGPSLatitude : kCGImagePropertyGPSLongitude, nil)
-                set(kCGImagePropertyGPSDictionary, isLat ? kCGImagePropertyGPSLatitudeRef : kCGImagePropertyGPSLongitudeRef, nil)
-                return
+            removeMatching(kCGImagePropertyExifDictionary, kCGImagePropertyExifDateTimeOriginal, from: metadata)
+            removeTwins(["photoshop:DateCreated"], from: metadata)
+            if !value.isEmpty {
+                CGImageMetadataSetValueMatchingImageProperty(metadata, kCGImagePropertyExifDictionary, kCGImagePropertyExifDateTimeOriginal, value as CFString)
             }
+        case .make, .model:
+            let key = field == .make ? kCGImagePropertyTIFFMake : kCGImagePropertyTIFFModel
+            removeMatching(kCGImagePropertyTIFFDictionary, key, from: metadata)
+            if !value.isEmpty {
+                CGImageMetadataSetValueMatchingImageProperty(metadata, kCGImagePropertyTIFFDictionary, key, value as CFString)
+            }
+        case .latitude, .longitude:
+            break // handled by applyCoordinates
+        }
+    }
+
+    /// Sets or clears latitude/longitude. Returns the GPS dictionary for the
+    /// TIFF second pass.
+    private static func applyCoordinates(_ values: [MetadataField: String], to metadata: CGMutableImageMetadata) throws -> [CFString: Any] {
+        var gps: [CFString: Any] = [:]
+        for field in [MetadataField.latitude, .longitude] {
+            guard let value = values[field] else { continue }
+            let isLat = field == .latitude
+            let key = isLat ? kCGImagePropertyGPSLatitude : kCGImagePropertyGPSLongitude
+            let refKey = isLat ? kCGImagePropertyGPSLatitudeRef : kCGImagePropertyGPSLongitudeRef
+            removeMatching(kCGImagePropertyGPSDictionary, key, from: metadata)
+            removeMatching(kCGImagePropertyGPSDictionary, refKey, from: metadata)
+            guard !value.isEmpty else { continue }
             guard let number = Double(value.replacingOccurrences(of: ",", with: ".")), abs(number) <= (isLat ? 90 : 180) else {
                 throw MacFlowError("\(field.label) must be a number between \(isLat ? "-90 and 90" : "-180 and 180").")
             }
-            set(kCGImagePropertyGPSDictionary, isLat ? kCGImagePropertyGPSLatitude : kCGImagePropertyGPSLongitude, abs(number) as CFNumber)
-            set(kCGImagePropertyGPSDictionary, isLat ? kCGImagePropertyGPSLatitudeRef : kCGImagePropertyGPSLongitudeRef,
-                (isLat ? (number < 0 ? "S" : "N") : (number < 0 ? "W" : "E")) as CFString)
+            let ref = isLat ? (number < 0 ? "S" : "N") : (number < 0 ? "W" : "E")
+            CGImageMetadataSetValueMatchingImageProperty(metadata, kCGImagePropertyGPSDictionary, key, abs(number) as CFNumber)
+            CGImageMetadataSetValueMatchingImageProperty(metadata, kCGImagePropertyGPSDictionary, refKey, ref as CFString)
+            gps[key] = abs(number)
+            gps[refKey] = ref
         }
+        return gps
     }
 
     /// True when both files decode to identical pixels (used to prove that a

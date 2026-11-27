@@ -50,8 +50,9 @@ enum ToolCatalog {
 
         case .pdf:
             if single {
-                return Tools(primary: [.pdfCompress, .pages, .pdfMetadata, .protect, .watermark, .pageNumbers, .ocr],
-                             more: [.splitPDF, .extractText])
+                // Splitting a one-page PDF would only reproduce it.
+                let more: [FileTool] = PDFTools.pageCount(files[0].url) > 1 ? [.splitPDF, .extractText] : [.extractText]
+                return Tools(primary: [.pdfCompress, .pages, .pdfMetadata, .protect, .watermark, .pageNumbers, .ocr], more: more)
             }
             return Tools(primary: [.mergePDF, .pdfCompress, .protect, .watermark, .pageNumbers, .extractText], more: [])
 
