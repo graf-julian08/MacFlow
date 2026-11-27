@@ -40,7 +40,7 @@ final class ToolContext: ObservableObject {
 @MainActor
 final class ToolPanelController: NSObject, NSWindowDelegate {
 
-    private var panel: ToolPanel?
+    private(set) var panel: ToolPanel?
     private var context: ToolContext?
     private var previousApp: NSRunningApplication?
     private var runningTask: Task<Void, Never>?
@@ -91,8 +91,7 @@ final class ToolPanelController: NSObject, NSWindowDelegate {
 
         // The hosting controller drives the window size, so the panel grows
         // and shrinks with its content (errors, options, previews).
-        let metrics = TitlebarMetrics()
-        let controller = NSHostingController(rootView: view.environment(\.toolPanelAppearance, true).environment(\.titlebarMetrics, metrics))
+        let controller = NSHostingController(rootView: view.environment(\.toolPanelAppearance, true))
         // Tool panels can grow (zoom, resize) but never shrink below their
         // content; the confirmation card always fits its content exactly.
         controller.sizingOptions = resizable ? [.minSize] : [.preferredContentSize]
@@ -103,9 +102,10 @@ final class ToolPanelController: NSObject, NSWindowDelegate {
                               backing: .buffered, defer: false)
         panel.titleVisibility = .hidden
         panel.titlebarAppearsTransparent = true
-        if !resizable {
-            panel.standardWindowButton(.miniaturizeButton)?.isHidden = true
-            panel.standardWindowButton(.zoomButton)?.isHidden = true
+        // The glass background covers the system buttons; the title bar
+        // draws its own, centred with the title (same actions and shortcuts).
+        for type: NSWindow.ButtonType in [.closeButton, .miniaturizeButton, .zoomButton] {
+            panel.standardWindowButton(type)?.isHidden = true
         }
         panel.isMovableByWindowBackground = true
         panel.isReleasedWhenClosed = false
@@ -124,7 +124,6 @@ final class ToolPanelController: NSObject, NSWindowDelegate {
             }
         }()
         panel.setFrame(Self.frame(size: size, around: location), display: false)
-        metrics.measure(in: panel, resizable: resizable)
         panel.onEscape = { [weak self] in
             guard let self else { return }
             if let context = self.context, context.busy { return }
@@ -365,83 +364,114 @@ private struct ConfirmView: View {
 
 // MARK: - Title bar
 
-/// Position of the window buttons, measured on the real window so the
-/// title sits right next to them on every macOS version.
-final class TitlebarMetrics: ObservableObject {
-    @Published var leading: CGFloat = 80
-    @Published var height: CGFloat = 32
-
-    @MainActor
-    func measure(in window: NSWindow, resizable: Bool) {
-        let buttons: [NSWindow.ButtonType] = resizable ? [.zoomButton, .miniaturizeButton, .closeButton] : [.closeButton]
-        guard let button = buttons.lazy.compactMap({ window.standardWindowButton($0) }).first(where: { !$0.isHidden }),
-              let container = button.superview else { return }
-        let frame = container.convert(button.frame, to: nil)
-        leading = frame.maxX + 12
-        // Centre the title row on the buttons.
-        height = max(28, (window.frame.height - frame.midY) * 2)
-    }
-}
-
-private struct TitlebarMetricsKey: EnvironmentKey { static let defaultValue = TitlebarMetrics() }
-extension EnvironmentValues {
-    var titlebarMetrics: TitlebarMetrics {
-        get { self[TitlebarMetricsKey.self] }
-        set { self[TitlebarMetricsKey.self] = newValue }
-    }
-}
-
-/// Slim top bar of every panel: icon, title and file name aligned with the
-/// window buttons. The whole bar moves the window; double-click follows the
-/// system "double-click a window's title bar" preference.
+/// Slim top bar of every panel: window buttons, icon, title and file name,
+/// all vertically centred. The free area moves the window; double-click
+/// follows the system "double-click a window's title bar" preference.
 struct PanelTitleBar: View {
-    @Environment(\.titlebarMetrics) private var metrics
     let symbol: String
     let tint: Color
     let title: String
     let subtitle: String?
+    @State private var window: NSWindow?
 
     var body: some View {
-        TitleBarRow(metrics: metrics, symbol: symbol, tint: tint, title: title, subtitle: subtitle)
+        ZStack(alignment: .leading) {
+            WindowDragArea()
+            HStack(spacing: 0) {
+                WindowButtons(window: window)
+                    .padding(.trailing, 16)
+                ZStack {
+                    Circle().fill(tint)
+                    Image(systemName: symbol)
+                        .font(.system(size: 9.5, weight: .bold))
+                        .foregroundStyle(.white)
+                }
+                .frame(width: 20, height: 20)
+                .padding(.trailing, 8)
+                Text(title)
+                    .font(.system(size: 13, weight: .semibold))
+                    .lineLimit(1)
+                    .layoutPriority(1)
+                    .allowsHitTesting(false)
+                if let subtitle, !subtitle.isEmpty {
+                    Text(subtitle)
+                        .font(.system(size: 12))
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                        .padding(.leading, 7)
+                        .allowsHitTesting(false)
+                }
+                Spacer(minLength: 12)
+            }
+            .padding(.leading, 20)
+        }
+        .frame(height: 44)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(WindowReader(window: $window))
+        .accessibilityElement(children: .contain)
     }
 }
 
-private struct TitleBarRow: View {
-    @ObservedObject var metrics: TitlebarMetrics
-    let symbol: String
-    let tint: Color
-    let title: String
-    let subtitle: String?
+/// Close / minimise / zoom in the macOS style: coloured when the window is
+/// key, grey otherwise, glyphs on hover.
+private struct WindowButtons: View {
+    let window: NSWindow?
+    @Environment(\.controlActiveState) private var activeState
+    @Environment(\.colorScheme) private var scheme
+    @State private var hovering = false
+
+    private var canMinimize: Bool { window?.styleMask.contains(.miniaturizable) ?? false }
+    private var canZoom: Bool { window?.styleMask.contains(.resizable) ?? false }
 
     var body: some View {
-        HStack(spacing: 7) {
-            ZStack {
-                Circle().fill(tint)
-                Image(systemName: symbol)
-                    .font(.system(size: 9.5, weight: .bold))
-                    .foregroundStyle(.white)
+        HStack(spacing: 8) {
+            button(color: Color(red: 1.0, green: 0.37, blue: 0.34), glyph: "xmark", enabled: true, help: "Close") {
+                window?.performClose(nil)
             }
-            .frame(width: 19, height: 19)
-            Text(title)
-                .font(.system(size: 13, weight: .semibold))
-                .lineLimit(1)
-                .layoutPriority(1)
-            if let subtitle, !subtitle.isEmpty {
-                Text(subtitle)
-                    .font(.system(size: 12))
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-                    .truncationMode(.middle)
+            button(color: Color(red: 1.0, green: 0.74, blue: 0.18), glyph: "minus", enabled: canMinimize, help: "Minimise") {
+                window?.performMiniaturize(nil)
             }
-            Spacer(minLength: 12)
+            button(color: Color(red: 0.16, green: 0.78, blue: 0.25), glyph: "plus", enabled: canZoom, help: "Zoom") {
+                window?.performZoom(nil)
+            }
         }
-        .padding(.leading, metrics.leading)
-        .frame(height: metrics.height)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .contentShape(Rectangle())
-        .overlay { WindowDragArea() }
-        .accessibilityElement(children: .combine)
-        .accessibilityAddTraits(.isHeader)
+        .onHover { hovering = $0 }
+    }
+
+    private func button(color: Color, glyph: String, enabled: Bool, help: String, action: @escaping () -> Void) -> some View {
+        let active = activeState == .key || activeState == .active || hovering
+        let grey = scheme == .dark ? Color.white.opacity(0.22) : Color.black.opacity(0.16)
+        return Button(action: action) {
+            ZStack {
+                Circle().fill(enabled && active ? color : grey)
+                Circle().strokeBorder(Color.black.opacity(enabled && active ? 0.12 : 0.06), lineWidth: 0.5)
+                if hovering && enabled {
+                    Image(systemName: glyph)
+                        .font(.system(size: 7.5, weight: .heavy))
+                        .foregroundStyle(Color.black.opacity(0.55))
+                }
+            }
+            .frame(width: 13, height: 13)
+            .contentShape(Circle())
+        }
+        .buttonStyle(.plain)
+        .disabled(!enabled)
+        .help(help)
+        .accessibilityLabel(help)
+    }
+}
+
+/// Gives SwiftUI access to the hosting window.
+private struct WindowReader: NSViewRepresentable {
+    @Binding var window: NSWindow?
+    func makeNSView(context: Context) -> NSView {
+        let view = NSView()
+        DispatchQueue.main.async { window = view.window }
+        return view
+    }
+    func updateNSView(_ nsView: NSView, context: Context) {
+        if window !== nsView.window { DispatchQueue.main.async { window = nsView.window } }
     }
 }
 
