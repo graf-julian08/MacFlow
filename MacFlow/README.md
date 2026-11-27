@@ -17,7 +17,8 @@ wheel segment.
 * New results are selected in Finder right away and scrolled into view (Settings → General → "Reveal results in Finder").
 * Holding the pointer on MORE flips to the next page; the segment that lands under the pointer stays inert until you
   move to another segment or the centre, so pages never flip back and forth by themselves.
-* Tool panels have the standard window buttons (close, minimise, zoom) and can be resized; previews grow with them.
+* Tool panels have the standard window buttons (close, minimise, zoom), a slim title bar you can drag to move the
+  panel (double-click follows the system setting) and can be resized; previews grow with them.
 * Progress, success ("Show" in Finder) and errors appear in a glass status card at the top of the screen.
 
 ## Install

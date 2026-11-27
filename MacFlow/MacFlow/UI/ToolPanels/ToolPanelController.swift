@@ -91,7 +91,8 @@ final class ToolPanelController: NSObject, NSWindowDelegate {
 
         // The hosting controller drives the window size, so the panel grows
         // and shrinks with its content (errors, options, previews).
-        let controller = NSHostingController(rootView: view.environment(\.toolPanelAppearance, true))
+        let metrics = TitlebarMetrics()
+        let controller = NSHostingController(rootView: view.environment(\.toolPanelAppearance, true).environment(\.titlebarMetrics, metrics))
         // Tool panels can grow (zoom, resize) but never shrink below their
         // content; the confirmation card always fits its content exactly.
         controller.sizingOptions = resizable ? [.minSize] : [.preferredContentSize]
@@ -123,6 +124,7 @@ final class ToolPanelController: NSObject, NSWindowDelegate {
             }
         }()
         panel.setFrame(Self.frame(size: size, around: location), display: false)
+        metrics.measure(in: panel, resizable: resizable)
         panel.onEscape = { [weak self] in
             guard let self else { return }
             if let context = self.context, context.busy { return }
@@ -250,51 +252,32 @@ struct ToolChrome<Content: View>: View {
     @ViewBuilder let content: () -> Content
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            header
-            content()
-                .disabled(context.busy)
-            if let error = context.error {
-                HStack(alignment: .top, spacing: 8) {
-                    Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(Color(nsColor: .systemRed))
-                    Text(error).font(.system(size: 12)).fixedSize(horizontal: false, vertical: true)
+        VStack(alignment: .leading, spacing: 0) {
+            PanelTitleBar(symbol: context.tool.sfSymbol, tint: AppSettings.shared.accentColor, title: context.tool.title, subtitle: context.subtitle)
+            VStack(alignment: .leading, spacing: 16) {
+                content()
+                    .disabled(context.busy)
+                if let error = context.error {
+                    HStack(alignment: .top, spacing: 8) {
+                        Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(Color(nsColor: .systemRed))
+                        Text(error).font(.system(size: 12)).fixedSize(horizontal: false, vertical: true)
+                    }
+                    .padding(10)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(RoundedRectangle(cornerRadius: 10, style: .continuous).fill(Color(nsColor: .systemRed).opacity(0.1)))
+                    .transition(.opacity.combined(with: .move(edge: .bottom)))
                 }
-                .padding(10)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .background(RoundedRectangle(cornerRadius: 10, style: .continuous).fill(Color(nsColor: .systemRed).opacity(0.1)))
-                .transition(.opacity.combined(with: .move(edge: .bottom)))
+                footer
             }
-            footer
+            .padding(.horizontal, 22)
+            .padding(.top, 10)
+            .padding(.bottom, 18)
+            .frame(maxHeight: .infinity, alignment: .top)
         }
-        .padding(.horizontal, 22)
-        .padding(.top, 18)
-        .padding(.bottom, 18)
         // The given width is the minimum; zoom/resize lets previews grow.
         .frame(minWidth: width, maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .background { ToolPanelBackground() }
         .animation(.easeOut(duration: 0.18), value: context.error)
-    }
-
-    private var header: some View {
-        HStack(spacing: 12) {
-            ZStack {
-                Circle().fill(AppSettings.shared.accentColor)
-                Image(systemName: context.tool.sfSymbol)
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundStyle(.white)
-            }
-            .frame(width: 34, height: 34)
-            VStack(alignment: .leading, spacing: 1) {
-                Text(context.tool.title).font(.system(size: 15, weight: .semibold))
-                Text(context.subtitle)
-                    .font(.system(size: 11.5))
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-                    .truncationMode(.middle)
-            }
-            Spacer()
-        }
-        .padding(.leading, 76) // clear the window's close, minimise and zoom buttons
     }
 
     private var footer: some View {
@@ -359,27 +342,130 @@ private struct ConfirmView: View {
     let completion: (Bool) -> Void
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            HStack(spacing: 12) {
-                ZStack {
-                    Circle().fill(Color(nsColor: .systemOrange))
-                    Image(systemName: "exclamationmark").font(.system(size: 14, weight: .bold)).foregroundStyle(.white)
+        VStack(alignment: .leading, spacing: 0) {
+            PanelTitleBar(symbol: "exclamationmark", tint: Color(nsColor: .systemOrange), title: title, subtitle: nil)
+            VStack(alignment: .leading, spacing: 14) {
+                Text(message).font(.system(size: 12.5)).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                HStack {
+                    Spacer()
+                    Button("Cancel") { completion(false) }.keyboardShortcut(.cancelAction).controlSize(.large)
+                    Button(confirmTitle) { completion(true) }
+                        .keyboardShortcut(.defaultAction).buttonStyle(.borderedProminent).controlSize(.large)
+                        .tint(AppSettings.shared.accentColor)
                 }
-                .frame(width: 34, height: 34)
-                Text(title).font(.system(size: 15, weight: .semibold))
             }
-            .padding(.leading, 52)
-            Text(message).font(.system(size: 12.5)).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
-            HStack {
-                Spacer()
-                Button("Cancel") { completion(false) }.keyboardShortcut(.cancelAction).controlSize(.large)
-                Button(confirmTitle) { completion(true) }
-                    .keyboardShortcut(.defaultAction).buttonStyle(.borderedProminent).controlSize(.large)
-                    .tint(AppSettings.shared.accentColor)
-            }
+            .padding(.horizontal, 20)
+            .padding(.top, 8)
+            .padding(.bottom, 20)
         }
-        .padding(20)
         .frame(width: 420)
         .background { ToolPanelBackground() }
+    }
+}
+
+// MARK: - Title bar
+
+/// Position of the window buttons, measured on the real window so the
+/// title sits right next to them on every macOS version.
+final class TitlebarMetrics: ObservableObject {
+    @Published var leading: CGFloat = 80
+    @Published var height: CGFloat = 32
+
+    @MainActor
+    func measure(in window: NSWindow, resizable: Bool) {
+        let buttons: [NSWindow.ButtonType] = resizable ? [.zoomButton, .miniaturizeButton, .closeButton] : [.closeButton]
+        guard let button = buttons.lazy.compactMap({ window.standardWindowButton($0) }).first(where: { !$0.isHidden }),
+              let container = button.superview else { return }
+        let frame = container.convert(button.frame, to: nil)
+        leading = frame.maxX + 12
+        // Centre the title row on the buttons.
+        height = max(28, (window.frame.height - frame.midY) * 2)
+    }
+}
+
+private struct TitlebarMetricsKey: EnvironmentKey { static let defaultValue = TitlebarMetrics() }
+extension EnvironmentValues {
+    var titlebarMetrics: TitlebarMetrics {
+        get { self[TitlebarMetricsKey.self] }
+        set { self[TitlebarMetricsKey.self] = newValue }
+    }
+}
+
+/// Slim top bar of every panel: icon, title and file name aligned with the
+/// window buttons. The whole bar moves the window; double-click follows the
+/// system "double-click a window's title bar" preference.
+struct PanelTitleBar: View {
+    @Environment(\.titlebarMetrics) private var metrics
+    let symbol: String
+    let tint: Color
+    let title: String
+    let subtitle: String?
+
+    var body: some View {
+        TitleBarRow(metrics: metrics, symbol: symbol, tint: tint, title: title, subtitle: subtitle)
+    }
+}
+
+private struct TitleBarRow: View {
+    @ObservedObject var metrics: TitlebarMetrics
+    let symbol: String
+    let tint: Color
+    let title: String
+    let subtitle: String?
+
+    var body: some View {
+        HStack(spacing: 7) {
+            ZStack {
+                Circle().fill(tint)
+                Image(systemName: symbol)
+                    .font(.system(size: 9.5, weight: .bold))
+                    .foregroundStyle(.white)
+            }
+            .frame(width: 19, height: 19)
+            Text(title)
+                .font(.system(size: 13, weight: .semibold))
+                .lineLimit(1)
+                .layoutPriority(1)
+            if let subtitle, !subtitle.isEmpty {
+                Text(subtitle)
+                    .font(.system(size: 12))
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+            }
+            Spacer(minLength: 12)
+        }
+        .padding(.leading, metrics.leading)
+        .frame(height: metrics.height)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .contentShape(Rectangle())
+        .overlay { WindowDragArea() }
+        .accessibilityElement(children: .combine)
+        .accessibilityAddTraits(.isHeader)
+    }
+}
+
+/// Moves the window when the bar is dragged.
+struct WindowDragArea: NSViewRepresentable {
+    func makeNSView(context: Context) -> WindowDragView { WindowDragView() }
+    func updateNSView(_ nsView: WindowDragView, context: Context) {}
+}
+
+final class WindowDragView: NSView {
+    override var mouseDownCanMoveWindow: Bool { true }
+    override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
+
+    override func mouseDown(with event: NSEvent) {
+        guard let window else { return }
+        if event.clickCount == 2 {
+            let action = UserDefaults.standard.persistentDomain(forName: UserDefaults.globalDomain)?["AppleActionOnDoubleClick"] as? String ?? "Maximize"
+            switch action {
+            case "Minimize": if window.styleMask.contains(.miniaturizable) { window.performMiniaturize(nil) }
+            case "None": break
+            default: if window.styleMask.contains(.resizable) { window.performZoom(nil) }
+            }
+            return
+        }
+        window.performDrag(with: event)
     }
 }
